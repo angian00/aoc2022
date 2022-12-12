@@ -1,0 +1,44 @@
+
+cmake_minimum_required (VERSION 3.8)
+
+project(AoC_2022 CXX)
+set(CMAKE_CXX_STANDARD 20)
+
+
+add_executable(day_01a day_01a.cpp)
+add_executable(day_01b day_01b.cpp)
+
+add_executable(day_02a day_02a.cpp)
+add_executable(day_02b day_02b.cpp)
+
+add_executable(day_03a day_03a.cpp)
+add_executable(day_03b day_03b.cpp)
+
+add_executable(day_04a day_04a.cpp)
+add_executable(day_04b day_04b.cpp)
+
+add_executable(day_05a day_05a.cpp)
+add_executable(day_05b day_05b.cpp)
+
+add_executable(day_06a day_06a.cpp)
+add_executable(day_06b day_06b.cpp)
+
+add_executable(day_07a day_07a.cpp)
+add_executable(day_07b day_07b.cpp)
+
+add_executable(day_08a day_08a.cpp)
+add_executable(day_08b day_08b.cpp)
+
+add_executable(day_09a day_09a.cpp)
+add_executable(day_09b day_09b.cpp)
+
+add_executable(day_10a day_10a.cpp)
+add_executable(day_10b day_10b.cpp)
+
+add_executable(day_11a day_11a.cpp)
+add_executable(day_11b day_11b.cpp)
+
+add_executable(day_12a day_12a.cpp)
+add_executable(day_12b day_12b.cpp)
+
+#add_executable(day_13a day_13a.cpp)
