@@ -44,4 +44,7 @@ add_executable(day_12b day_12b.cpp)
 add_executable(day_13a day_13a.cpp)
 add_executable(day_13b day_13b.cpp)
 
-#add_executable(day_14a day_14a.cpp)
+add_executable(day_14a day_14a.cpp)
+add_executable(day_14b day_14b.cpp)
+
+#add_executable(day_15a day_15a.cpp)
