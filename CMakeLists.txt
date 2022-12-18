@@ -51,3 +51,10 @@ add_executable(day_15a day_15a.cpp)
 add_executable(day_15b day_15b.cpp)
 
 #add_executable(day_16a day_16a.cpp)
+add_executable(day_16a day_16a_02.cpp)
+#add_executable(day_16b day_16b.cpp)
+
+add_executable(day_17a day_17a.cpp)
+add_executable(day_17b day_17b.cpp)
+
+#add_executable(day_18a day_18a.cpp)

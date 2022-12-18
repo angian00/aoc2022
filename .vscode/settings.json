@@ -53,6 +53,8 @@
         "list": "cpp",
         "bitset": "cpp",
         "ctime": "cpp",
-        "regex": "cpp"
+        "regex": "cpp",
+        "map": "cpp",
+        "set": "cpp"
     }
 }
