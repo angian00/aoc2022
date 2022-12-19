@@ -9,6 +9,7 @@
 #include <ranges>
 #include <assert.h>
 #include <time.h>
+#include <climits>
 
 
 using namespace std;
