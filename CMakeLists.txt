@@ -60,4 +60,7 @@ add_executable(day_17b day_17b.cpp) #KO
 add_executable(day_18a day_18a.cpp)
 add_executable(day_18b day_18b.cpp)
 
-#add_executable(day_19a day_19a.cpp)
+add_executable(day_19a day_19a.cpp)
+add_executable(day_19b day_19b.cpp)
+
+#add_executable(day_20a day_20a.cpp)
