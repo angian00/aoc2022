@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <ctime>
 
 using namespace std;
 
@@ -40,14 +41,19 @@ int main(int argc, char *argv[])
     if (!f)
         throw std::system_error(errno, std::system_category(), "failed to open "+ filename);
 
-    int total = 0;
 
     while (getline(f, line))
     {
-        //total += curr_value;
     }
 
-    cout << total << "\n";
+    clock_t t_start = clock();
+
+    int total = 0;
+    //total += curr_value;
+
+    clock_t t_end = clock();
+    cout << "result: " << total << endl;
+    cout << "Execution time: " << (double) (t_end - t_start) / CLOCKS_PER_SEC << " seconds" << endl;
 
     return 0;
 }
