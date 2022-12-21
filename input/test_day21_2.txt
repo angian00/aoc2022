@@ -1,0 +1,5 @@
+root: ab + humn
+ab: a + b
+a: 1
+b: 2
+humn: 000

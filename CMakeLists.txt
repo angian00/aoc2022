@@ -4,7 +4,6 @@ cmake_minimum_required (VERSION 3.8)
 project(AoC_2022 CXX)
 set(CMAKE_CXX_STANDARD 20)
 
-
 add_executable(day_01a day_01a.cpp)
 add_executable(day_01b day_01b.cpp)
 
@@ -66,4 +65,7 @@ add_executable(day_19b day_19b.cpp) #KO
 add_executable(day_20a day_20a.cpp)
 add_executable(day_20b day_20b.cpp)
 
-#add_executable(day_21a day_21a.cpp)
+add_executable(day_21a day_21a.cpp)
+add_executable(day_21b day_21b.cpp)
+
+#add_executable(day_22a day_22a.cpp)

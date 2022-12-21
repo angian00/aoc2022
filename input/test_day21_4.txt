@@ -1,0 +1,7 @@
+root: c_humn + ab
+c_humn: c * humn
+ab: a + b
+a: 1
+b: 2
+c: 3
+humn: 000

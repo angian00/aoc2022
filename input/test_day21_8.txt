@@ -1,0 +1,7 @@
+root: deh + a
+deh: d - eh
+eh: e + humn
+a: 9
+d: 999
+e: 90
+humn: 000

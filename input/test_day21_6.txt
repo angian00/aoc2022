@@ -1,0 +1,11 @@
+root: hde + abc
+hde: hd * e
+hd: humn + d
+abc: ab * c
+ab: a + b
+a: 4
+b: 2
+c: 3
+d: 1
+e: 6
+humn: 000

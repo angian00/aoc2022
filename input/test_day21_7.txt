@@ -1,0 +1,5 @@
+root: dh + a
+dh: d - humn
+a: 4
+d: 3
+humn: 000
