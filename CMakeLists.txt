@@ -68,4 +68,7 @@ add_executable(day_20b day_20b.cpp)
 add_executable(day_21a day_21a.cpp)
 add_executable(day_21b day_21b.cpp)
 
-#add_executable(day_22a day_22a.cpp)
+add_executable(day_22a day_22a.cpp)
+add_executable(day_22b day_22b.cpp)
+
+#add_executable(day_23a day_23a.cpp)
