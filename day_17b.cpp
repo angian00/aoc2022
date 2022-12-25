@@ -10,10 +10,13 @@ using namespace std;
 
 
 const int field_width = 7;
-const int window_size = 1000;
-const int window_offset = 50;
-const int n_check_history = 200;
+const int window_size = 10000;
+const int window_offset = 2000;
+const int n_check_history = 4000;
 //const int n_check_history = 10000;
+
+bool loop_check_enabled = true;
+//bool loop_check_enabled = false;
 
 
 typedef long long GridCoord;
@@ -182,7 +185,6 @@ struct HistoryItem {
 class PlayField {
     public:
         PlayField() {
-            width = field_width;
             height_solid = 0;
             i_pattern = 0;
             i_rock = 0;
@@ -190,12 +192,11 @@ class PlayField {
             y_offset = 0;
         }
 
-        void play(GridCoord n_rocks, string moves, bool loop_check_enabled) {
+        void play(GridCoord n_rocks, string moves) {
             GridCoord computed_height_solid = 0;
-            int tail_n_rocks = -1;
+            int tail_n_rocks;
+            bool loop_found = false;
             int tail_height_solid_start = 0;
-            int head_n_rocks = -1;
-
 
             create_active_rock();
             //print();
@@ -214,36 +215,54 @@ class PlayField {
 
                 bool could_move_rock = move_rock_down();
 
-                if (loop_check_enabled && !could_move_rock && tail_n_rocks != -1) {
+                if (loop_check_enabled && !could_move_rock && loop_found) {
                     tail_n_rocks --;
-                    if (tail_n_rocks < 0) {
+                    //cout << "new rock; " << tail_n_rocks << " more rocks; i_move=" << i_move << endl;
+                    if (tail_n_rocks == 0) {
                         cout << "Stopping; i_rock=" << i_rock << ", height_solid=" << height_solid << endl;
+                        //cout << "tail:"  << endl;
+                        //print(tail_height_solid_start+1);
                         break;
                     }
                 }
 
-                if (loop_check_enabled && !could_move_rock && (tail_n_rocks == -1) && (i_rock % n_check_history == 0)) {
+                if (loop_check_enabled && !could_move_rock && (!loop_found) && (i_rock % n_check_history == 0)) {
+                    //every n_check_history rocks, check for loops
+
                     // check for loops
                     int start_loop_index = check_history();
 
                     if (start_loop_index != -1) {
+                        loop_found = true;
+
                         auto start_loop_item = history[start_loop_index];
-                        if (head_n_rocks != -1 && head_n_rocks != start_loop_item.i_rock)
-                            continue;
 
                         cout << "Found history repeating between i_rock=" << start_loop_item.i_rock << " and i_rock=" << i_rock 
-                            <<", heights " << start_loop_item.height_solid << " and " << height_solid << endl;
+                            << ", heights " << start_loop_item.height_solid << " and " << height_solid 
+                            << ", i_moves " << start_loop_item.i_move << " and " << i_move
+                            << ", pattern " << start_loop_item.pattern << " and " << active_rock->pattern.name << endl;
                         
-                        head_n_rocks = start_loop_item.i_rock;
+                        auto head_n_rocks = start_loop_item.i_rock;
                         auto head_height_solid = start_loop_item.height_solid;
-                        auto loop_n_rocks = i_rock - head_n_rocks;
+                        //auto loop_n_rocks = i_rock - head_n_rocks;
+                        auto loop_n_rocks = i_rock - head_n_rocks - 1;
 
                         auto loop_height_solid = height_solid - head_height_solid;
-                        auto n_loops = (n_rocks - head_n_rocks) / loop_n_rocks;
+                        //auto n_loops = (n_rocks - head_n_rocks) / loop_n_rocks;
+                        auto n_loops = (n_rocks - head_n_rocks) / loop_n_rocks - 3; // for safety
+
                         computed_height_solid = n_loops * loop_height_solid + head_height_solid;
                         //assert(tail_n_rocks == ((n_rocks - head_n_rocks) % n_loops)); //OK
                         tail_n_rocks = n_rocks - head_n_rocks - n_loops * loop_n_rocks;
                         tail_height_solid_start = height_solid;
+
+                        //cout << "head:"  << endl;
+                        //print(0, head_height_solid);
+                        //cout << "loop:"  << endl;
+                        //print(window_offset, window_offset + loop_height_solid);
+
+                        //cout << "all so far:"  << endl;
+                        //print(0, head_height_solid);
 
                         cout << "i_move=" << i_move << endl;
                         cout << "moves.length=" << moves.length() << endl;
@@ -254,12 +273,14 @@ class PlayField {
                         cout << endl;
                         cout << "first repetition i_rock=" << i_rock << endl;
                         cout << "head_n_rocks=" << head_n_rocks << endl;
-                        cout << "head_height_solid=" << head_height_solid << endl;
+                        cout << "**** head_height_solid=" << head_height_solid << endl;
                         cout << "loop_n_rocks=" << loop_n_rocks << endl;
                         cout << "loop_height_solid=" << loop_height_solid << endl;
                         cout << "n_loops=" << n_loops << endl;
                         cout << "tail_n_rocks=" << tail_n_rocks << endl;
                         cout << "tail_height_solid_start=" << tail_height_solid_start << endl;
+                        cout << endl;
+                        cout << "**** looped height: " << (n_loops * loop_height_solid) << endl;
 
                         //print(head_height_solid-window_offset - 40);
 
@@ -275,9 +296,11 @@ class PlayField {
                 }
             }
             
-            cout << "Finished play; i_move=" << i_move << endl;
+            cout << "Finished play; i_rock=" << i_rock << " i_move=" << i_move << endl;
 
             if (tail_height_solid_start != 0) {
+                cout << "**** tail_height_solid: " << height_solid - tail_height_solid_start << endl;
+
                 computed_height_solid += height_solid - tail_height_solid_start;
                 height_solid = computed_height_solid;
             }
@@ -288,13 +311,18 @@ class PlayField {
             return height_solid;
         }
 
-        void print(GridCoord start_y=0) {
+
+        void print(GridCoord start_y=0, GridCoord end_y=-1) {
             cout << "(y_offset: " << y_offset << ")" << endl;
+
 
             if (start_y < 0)
                 start_y += tiles.size();
 
-            for (int y=tiles.size()-1; y >= start_y; y--) {
+            if (end_y < 0)
+                end_y += tiles.size();
+
+            for (int y=end_y; y >= start_y; y--) {
                 auto tile_row = tiles[y];
                 //cout << "Inside external loop; y=" << y << endl;
                 for (int x=0; x < tile_row.size(); x++) {
@@ -339,7 +367,7 @@ class PlayField {
             int n_rows_before = tiles.size();
             for (int i=0; i < active_rock->curr_pos.y - y_offset + active_rock->pattern.h - n_rows_before; i++) {
                 vector<bool> tile_row;
-                for (int x=0; x < width; x++)
+                for (int x=0; x < field_width; x++)
                     tile_row.push_back(false);
                 tiles.push_back(tile_row);
                 //cout << "tile_row size: " << tile_row.size() << endl;
@@ -406,7 +434,7 @@ class PlayField {
 
                 bool repetition_found = true;
                 for (int delta_y=window_offset; delta_y < window_offset + window_size; delta_y++) {
-                    for (int x=0; x < width; x++) {
+                    for (int x=0; x < field_width; x++) {
                         // if (tiles[height_solid-delta_y][x]) {
                         //     cout << "check_history delta_y=" << delta_y << ", x=" << x << endl;
                         //     cout << "curr:" << tiles[height_solid-delta_y][x] << ", history=" << tiles[history_item.height_solid-delta_y][x] << endl;
@@ -465,7 +493,7 @@ class PlayField {
         bool rock_can_move(GridPos new_pos) {
             if (new_pos.x < 0)
                 return false;
-            if (new_pos.x + active_rock->pattern.w > width)
+            if (new_pos.x + active_rock->pattern.w > field_width)
                 return false;
             if (new_pos.y < 0)
                 return false;
@@ -510,7 +538,6 @@ class PlayField {
             free(active_rock);
         }
 
-        int width;
         GridCoord height_solid;
         GridCoord i_rock;
         int i_move;
@@ -539,15 +566,16 @@ int main(int argc, char *argv[])
 
     PlayField field;
     //int n_rocks = 2023;
-    //int n_rocks = 1000; //expected: 
-    int n_rocks = 100000; //expected: 151434
+    //int n_rocks = 300; //expected: 460
+    //int n_rocks = 2000; //expected: 3034
+    //int n_rocks = 100000; //expected: 151434
     //int n_rocks = 1000000; //expected: 1514288
     //int n_rocks = 10000000;
-    //int n_rocks = 1000000000000;
+    long long n_rocks = 1000000000000;
     //field.play(11, moves);
-    //field.play(n_rocks, moves, true);
-    field.play(n_rocks, moves, false);
-    //field.print();
+    field.play(n_rocks, moves);
+    if (!loop_check_enabled)
+        field.print();
     //field.print(-30);
 
     cout << "reached height: " << field.get_height_solid() << endl;
