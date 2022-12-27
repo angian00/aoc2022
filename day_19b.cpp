@@ -10,10 +10,11 @@
 using namespace std;
 
 
+//const int n_turns = 31;
 const int n_turns = 32;
 
 
-//enum order matters, since loops iterate over Geode first
+// enum order matters, since loops iterate over Geode first
 // and hence can be more efficient 
 enum ResourceType {
     Geode = 0,
@@ -129,7 +130,8 @@ class Optimizer {
     public:
         Optimizer(Blueprint blueprint): blueprint(blueprint) {}
 
-        int optimize() {
+
+        OptimizationResult optimize() {
             int start_stocks[N_RESOURCE_TYPES];
             int start_robots[N_RESOURCE_TYPES];
             ResourceType start_choices[n_turns];
@@ -158,26 +160,34 @@ class Optimizer {
             }
 
             auto opt_result = optimize_recurse(0, n_turns-initial_wait, start_stocks, start_robots, start_choices);
-            // cout << "Best strategy: " << endl; 
+            // cout << "Best strategy: " << endl;
             // for (auto choice: opt_result.choices) {
             //     cout << "\t" << resource_str(choice) << endl; 
             // }
 
-            return opt_result.n_geodes;
+            cout << "n_nodes: " << n_nodes << endl;
+            cout << "n_leaves: " << n_leaves << endl;
+            cout << "n_pruned_bounds: " << n_pruned_bounds << endl;
+
+            return opt_result;
         }
 
     private:
 
         OptimizationResult optimize_recurse(int best_so_far, int remaining_turns, int start_stocks[], int start_robots[], ResourceType start_choices[]) {
             int depth = n_turns - remaining_turns;
-            int max_final_geodes = 0;
-            ResourceType max_choices[n_turns];
+            ResourceType best_choices[n_turns];
 
-            if (depth < 5)
-                cout << "optimize_recurse; depth=" << depth << endl;
 
-            if (remaining_turns == 0)
+            n_nodes ++;
+
+            if (remaining_turns == 0) {
+                n_leaves ++;
                 return OptimizationResult(start_stocks[ResourceType::Geode], start_choices);
+            }
+
+            if (depth < 7)
+                cout << "optimize_recurse; depth=" << depth << "; remaining_turns=" << remaining_turns << endl;
 
 
             //bool trace_recursion = (depth == 2 && start_choices[2] == ResourceType::Clay);  
@@ -198,11 +208,18 @@ class Optimizer {
                 for (int resource_type=0; resource_type < N_RESOURCE_TYPES; resource_type++) {
                     cout << "\t" << resource_str(resource_type) << " " << start_robots[resource_type] << endl;
                 }
+                cout << "blueprint.robot_costs:" << endl;
+                for (int robot_type=0; robot_type < N_RESOURCE_TYPES; robot_type++) {
+                    for (int resource_type=0; resource_type < N_RESOURCE_TYPES; resource_type++) {
+                        cout << "\t" << resource_str(robot_type) << " " << resource_str(robot_type) << " " << 
+                            blueprint.robot_costs[robot_type][resource_type] << endl;
+                    }
+                }
                 cout << endl;
             }
 
             for (int i_turn=0; i_turn < depth; i_turn++)
-                max_choices[i_turn] = start_choices[i_turn];
+                best_choices[i_turn] = start_choices[i_turn];
                 
             for (int new_robot_type=0; new_robot_type < N_RESOURCE_TYPES; new_robot_type++) {
                 int stocks[N_RESOURCE_TYPES];
@@ -211,30 +228,38 @@ class Optimizer {
                 
                 bool is_choice_valid = true;
                 for (int resource_type=0; resource_type < N_RESOURCE_TYPES; resource_type++) {
-                    stocks[resource_type] = start_stocks[resource_type] 
-                                - blueprint.robot_costs[new_robot_type][resource_type];
+                    stocks[resource_type] = start_stocks[resource_type] - blueprint.robot_costs[new_robot_type][resource_type];
                     
                     if (stocks[resource_type] < 0) {
                         is_choice_valid = false;
                         break;
                     }
+                }
 
+                if (!is_choice_valid)
+                    continue;
+                
+                for (int resource_type=0; resource_type < N_RESOURCE_TYPES; resource_type++) {
                     stocks[resource_type] = stocks[resource_type] + start_robots[resource_type];
-                    
                     robots[resource_type] = start_robots[resource_type];
-                    if (resource_type == new_robot_type)
-                        robots[resource_type] ++;
-
                 }
 
-                //int at_most = upper_bound_1(remaining_turns-1, stocks[ResourceType::Geode], robots[ResourceType::Geode]);
-                //int at_most = upper_bound_2(remaining_turns-1, stocks, robots);
-                int at_most = upper_bound_3(remaining_turns-1, stocks, robots);
+                robots[new_robot_type] ++;
 
-                if (best_so_far >= at_most) {
-                    is_choice_valid = false;
+                if (is_choice_valid) {
+                    //cout << "new choice: " << resource_str(new_robot_type) << endl;
+
+                    //int at_most = upper_bound_1(remaining_turns-1, stocks[ResourceType::Geode], robots[ResourceType::Geode]);
+                    int at_most = upper_bound_2(remaining_turns-1, stocks, robots);
+
+                    //int at_most = upper_bound_3(remaining_turns-1, stocks, robots);
+                    //int at_most = upper_bound_3(remaining_turns, stocks, robots);
+
+                    if (at_most <= best_so_far) {
+                        n_pruned_bounds ++;
+                        is_choice_valid = false;
+                    }
                 }
-
 
                 if (trace_recursion)
                     cout << "optimize_recurse; depth=" << depth << ";new_robot_type=" << resource_str(new_robot_type) 
@@ -284,16 +309,18 @@ class Optimizer {
                 }
 
 
-                auto rec_result = optimize_recurse(max_final_geodes, remaining_turns-1, stocks, robots, choices);
-                if (rec_result.n_geodes > max_final_geodes) {
-                    max_final_geodes = rec_result.n_geodes;
+                auto rec_result = optimize_recurse(best_so_far, remaining_turns-1, stocks, robots, choices);
+                if (rec_result.n_geodes > best_so_far) {
+                    best_so_far = rec_result.n_geodes;
+                    //cout << "improved solution: " << best_so_far << " depth=" << depth << ", choice=" 
+                    //    << resource_str(rec_result.choices[depth]) << endl;
 
                     for (int i_turn=depth; i_turn < n_turns; i_turn++)
-                        max_choices[i_turn] = rec_result.choices[i_turn];
+                        best_choices[i_turn] = rec_result.choices[i_turn];
                 }
             }
 
-            return OptimizationResult(max_final_geodes, max_choices);
+            return OptimizationResult(best_so_far, best_choices);
         }
 
         int upper_bound_1(int remaining_turns, int start_geodes, int start_geode_robots) {
@@ -323,6 +350,11 @@ class Optimizer {
 
 
         int upper_bound_3(int remaining_turns, int start_stocks[], int start_robots[]) {
+            bool trace_upper_bound = false;
+            //bool trace_upper_bound = (start_robots[ResourceType::Clay] == 0 && remaining_turns == 20);
+
+            if (trace_upper_bound) cout << "upper_bound_3; remaining_turns: " << remaining_turns << endl;
+
             int stocks[N_RESOURCE_TYPES];
             int robots[N_RESOURCE_TYPES];
 
@@ -332,29 +364,65 @@ class Optimizer {
             }
 
             for (int i_turn=0; i_turn < remaining_turns; i_turn++) {
+                if (trace_upper_bound) {
+                    cout << "turn " << i_turn << endl;
+                    cout << "starting stock: " << endl;
+                    for (int resource_type=0; resource_type < N_RESOURCE_TYPES-1; resource_type++) {               
+                        cout << resource_str(resource_type) << " " << stocks[resource_type] << endl;     
+                    }
+
+                    cout << "starting robots: " << endl;
+                    for (int resource_type=0; resource_type < N_RESOURCE_TYPES-1; resource_type++) {               
+                        cout << resource_str(resource_type) << " " << robots[resource_type] << endl;     
+                    }
+                }
+
                 int next_robot_type = ResourceType::None;
-                for (int resource_type=0; resource_type < N_RESOURCE_TYPES-1; resource_type++) {                    
+                for (int resource_type=0; resource_type < N_RESOURCE_TYPES-2; resource_type++) {                    
                     if (stocks[resource_type+1] >= blueprint.robot_costs[resource_type][resource_type+1]) {
                         next_robot_type = resource_type;
                         break;
                     }
                 }
 
-                for (int resource_type=0; resource_type < N_RESOURCE_TYPES; resource_type++) {                    
+                for (int resource_type=0; resource_type < N_RESOURCE_TYPES-1; resource_type++) {                    
                     stocks[resource_type] += robots[resource_type];
-                    if (resource_type == next_robot_type) {
-                        robots[resource_type] ++;
-                        stocks[resource_type+1] -= blueprint.robot_costs[resource_type][resource_type+1];
+                }
+
+                if (next_robot_type != ResourceType::None) {
+                    robots[next_robot_type] ++;
+                    stocks[next_robot_type+1] -= blueprint.robot_costs[next_robot_type][next_robot_type+1];
+                }
+
+                if (trace_upper_bound) {
+                    cout << endl;
+                    cout << "new robot: " << resource_str(next_robot_type) << endl;
+                    cout << endl;
+
+                    cout << "ending stock: " << endl;
+                    for (int resource_type=0; resource_type < N_RESOURCE_TYPES-1; resource_type++) {               
+                        cout << resource_str(resource_type) << " " << stocks[resource_type] << endl;     
                     }
 
+                    cout << "ending robots: " << endl;
+                    for (int resource_type=0; resource_type < N_RESOURCE_TYPES-1; resource_type++) {               
+                        cout << resource_str(resource_type) << " " << robots[resource_type] << endl;     
+                    }
+
+                    cout << endl;
                 }
             }
+
+            if (trace_upper_bound) cout << "final geodes: " << stocks[ResourceType::Geode] << endl << endl;
 
             return stocks[ResourceType::Geode];
         }
 
 
     Blueprint blueprint;
+    unsigned long long n_nodes = 0;
+    unsigned long long n_leaves = 0;
+    unsigned long long n_pruned_bounds = 0;
 };
 
 
@@ -384,7 +452,7 @@ int main(int argc, char *argv[])
     int i_blueprint = 1;
     for (auto b: blueprints) {
         auto opt = Optimizer(b);
-        int n_geodes = opt.optimize();            
+        int n_geodes = opt.optimize().n_geodes;            
         cout << "Blueprint #" << i_blueprint << ": " << n_geodes << "\n";
         tot_quality_level *= n_geodes;
 
@@ -393,8 +461,17 @@ int main(int argc, char *argv[])
         i_blueprint ++;
     }
 
+    // auto opt = Optimizer(blueprints[1]);
+    // auto opt_result = opt.optimize();
+    // cout << "Blueprint result: " << opt_result.n_geodes << "\n";
+    // cout << "Best strategy: " << endl;
+    // for (int i_choice=0; i_choice < n_turns; i_choice++) {
+    //     cout << "\t" << resource_str(opt_result.choices[i_choice]) << endl; 
+    // }
+
+
     clock_t t_end = clock();
-    cout << "result: " << tot_quality_level << endl;
+    //cout << "result: " << tot_quality_level << endl;  //must be > 10064
     cout << "Execution time: " << (double) (t_end - t_start) / CLOCKS_PER_SEC << " seconds" << endl;
 
     return 0;
