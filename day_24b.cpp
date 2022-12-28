@@ -13,18 +13,9 @@ using namespace std;
 
 
 
-/*
-const int max_rounds = 25;
-const int w = 7;
-const int h = 7;
-*/
-
-// const int max_rounds = 25;
 // const int w = 8;
 // const int h = 6;
 
-const int max_rounds = 163;
-//const int max_rounds = 450;
 const int w = 122;
 const int h = 27;
 
@@ -176,13 +167,17 @@ class GridMap {
         }
 
         bool is_wall(GridPos pos) {
-            if (pos.x == 0)
+            if (pos.x <= 0)
                 return true;
 
-            if (pos.x == w-1)
+            if (pos.x >= w-1)
                 return true;
 
             if (pos.y < 0) {
+                return true;
+            }
+
+            if (pos.y >= h) {
                 return true;
             }
 
@@ -291,26 +286,30 @@ class Optimizer {
     public:
         Optimizer(GridMap grid_map): grid_map(grid_map)  {}
 
-        int compute_path_len() {
+        void compute_path_len() {
             cout << "compute_path_len" << endl;
 
-            int res = compute_path(start_pos, end_pos);
+            int trip1 = compute_path(start_pos, end_pos);
+            cout << "first trip: " << trip1 << endl;
+            int trip2 = compute_path(end_pos, start_pos);
+            cout << "second trip: " << trip2 << endl;
+            int trip3 = compute_path(start_pos, end_pos);
+            cout << "third trip: " << trip3 << endl;
 
+            cout << "total: " << (trip1 + trip2 + trip3) << endl;
             cout << "n_explored_nodes: " << n_explored_nodes << endl;
             cout << "n_leaves: " << n_leaves << endl;
             cout << "n_lower_bound: " << n_lower_bound << endl;
-
-            return res;
         }
 
 
     private:
-        int compute_path(GridPos start_pos, GridPos end_pos) {
+        int compute_path(GridPos from_pos, GridPos to_pos) {
             int i_round = 0;
             
             set<GridPos>* curr_round_pos;
             set<GridPos>* next_round_pos = new set<GridPos>();
-            next_round_pos->insert(start_pos);
+            next_round_pos->insert(from_pos);
 
             while (true) {
                 curr_round_pos = next_round_pos;
@@ -320,8 +319,10 @@ class Optimizer {
                 grid_map.move_blizzards();
 
                 for (auto curr_pos: (*curr_round_pos)) {
+                    // if (from_pos.y != 0)
+                    //     cout << "curr_pos: " << curr_pos << endl;
                     for (auto next_pos: enumerate_steps(curr_pos)) {
-                        if (next_pos == end_pos) {
+                        if (next_pos == to_pos) {
                             //found solution
                             return i_round + 1;
                         }
@@ -391,11 +392,10 @@ int main(int argc, char *argv[])
     clock_t t_start = clock();
 
     Optimizer optimizer(grid_map);
-    int total_len = optimizer.compute_path_len();
+    optimizer.compute_path_len();
     
     clock_t t_end = clock();
 
-    cout << "result: " << total_len << endl; //must be 244 < x < 449
     cout << "Execution time: " << (double) (t_end - t_start) / CLOCKS_PER_SEC << " seconds" << endl;
 
     return 0;
