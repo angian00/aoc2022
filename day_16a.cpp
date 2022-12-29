@@ -5,6 +5,7 @@
 #include <set>
 #include <map>
 #include <algorithm>
+#include <functional>
 #include <regex>
 #include <ranges>
 #include <assert.h>
@@ -14,6 +15,9 @@
 
 using namespace std;
 
+
+const bool trace = false;
+const int n_steps = 30;
 
 class Valve {
     public:
@@ -83,16 +87,46 @@ class ValveSystem {
             return res;
         }
 
+        vector<string> get_flowing_valves() {
+            vector<string> res;
+
+            for (auto v: valves) {
+                if (v.second->flow_rate > 0)
+                    res.push_back(v.first);
+            }
+
+            auto comp_func = std::bind(&ValveSystem::compare_valves, this, std::placeholders::_1, std::placeholders::_2);
+            sort(res.begin(), res.end(), comp_func);
+
+            return res;
+        }
+
+
+        int get_max_flow() {
+            int res = 0;
+            for (auto v: valves) {
+                if (v.second->flow_rate > 0)
+                    res += v.second->flow_rate;
+            }
+
+            return res;
+        }
+
+
         void print() {
-            cout << endl;
+            cout << "---- valve system: " << endl;
 
             for (auto v: valves) {
                 cout << *v.second << endl;
             }
+
+            cout << endl;
         }
 
 
     private:
+        bool compare_valves (string v1, string v2) { return (valves[v1]->flow_rate > valves[v2]->flow_rate); }
+        
         map<string, Valve*> valves;
 };
 
@@ -115,18 +149,6 @@ struct ValveSystemState {
             open_valves.insert(ov);
         }
     }
-
-    int pressure_upper_bound(ValveSystem* valve_system) {
-        int res = tot_pressure;
-        
-        for (auto v_name: valve_system->get_valves()) {
-            if (!open_valves.contains(v_name))
-                res += (remaining_steps-1) * (valve_system->get_valve(v_name)->flow_rate);
-        }
-
-        return res;
-    }
-
 
     friend bool operator<(const ValveSystemState& lhs, const ValveSystemState& rhs) { 
         if (lhs.remaining_steps < rhs.remaining_steps)
@@ -186,13 +208,13 @@ struct ValveMove {
 
 
 
-struct OptimizationState {
-    ValveSystemState system_state;
-    vector<ValveMove> move_list;
+struct StateAndMoves {
+    ValveSystemState state;
+    vector<ValveMove> moves;
 };
 
 
-string find_lowest_f(set<string> open_set, map<string, int> f_scores) {
+string find_lowest(set<string> open_set, map<string, int> f_scores) {
     //FIXME: optimize by changing f_score data structure
     int min_f_score = INT_MAX;
     string min_node;
@@ -227,141 +249,207 @@ vector<string> reconstruct_path(map<string, string> came_from, string end_node) 
 }
 
 
+
 class Optimizer {
     public:
         Optimizer(ValveSystem *valve_system) : valve_system(valve_system) {
-            for (auto v: valve_system->get_valves()) {
-                if (valve_system->get_valve(v)->flow_rate > 0)
-                    flowing_valves.push_back(v);
-            }
+            flowing_valves = valve_system->get_flowing_valves();
 
-            //TODO: order by decreasing flow rate
-            
-            cout << "valves with flow_rate > 0: " << endl;
-            for (auto v: flowing_valves)
-                cout << v << endl;
-            cout << endl;
+            // cout << "---- valves with flow_rate > 0: " << endl;
+            // for (auto v: flowing_valves)
+            //     cout << v << " " << valve_system->get_valve(v)->flow_rate << endl;
+            // cout << endl;
 
             paths = compute_paths(flowing_valves);
+            print_paths();
         }
 
         void print_paths() {
+            cout << "---- computed paths: " << endl;
+
             for (auto path: paths) {
-                //cout << "path from " << path.first.first << " to " << path.first.second <<endl;
+                cout << "path from " << path.first.first << " to " << path.first.second <<endl;
                 cout << " \t ";
-                for (auto step: path.second)
+                for (auto step: path.second) 
                     cout << step << ",";
                 cout << endl;
             }
+
+            cout << endl;
+
         }
 
-        void print_path(vector<string> path) {
+        void print_steps(vector<string> path) {
             for (auto step: path)
                 cout << "\tgo to " << step << endl;
         }
 
 
-        void optimize(int n_steps, string start_valve) {
+        void optimize(string start_valve) {
             cout << "optimize " << endl;
-            OptimizationState start_state;
+            StateAndMoves state_and_moves;
 
-            start_state.system_state.curr_pos = start_valve;
-            start_state.system_state.remaining_steps = n_steps;
+            state_and_moves.state.curr_pos = start_valve;
+            state_and_moves.state.remaining_steps = n_steps;
             
-            auto end_state = optimize_recurse(start_state);
+            auto opt_result = optimize_recurse(state_and_moves, 0);
 
             cout << endl;
-            cout << "tot_pressure: " << end_state.system_state.tot_pressure << endl;
+            cout << "tot_pressure: " << opt_result.state.tot_pressure << endl;
             cout << endl;
             cout << "open valves: [";
-            for (auto v_name: end_state.system_state.open_valves) {
+            for (auto v_name: opt_result.state.open_valves) {
                 cout << v_name << ", ";
             }
             cout << "]" << endl;
             cout << endl;
 
-            cout << "moves:" <<endl;
-            string curr_valve = start_valve;
-            for (auto move: end_state.move_list) {
-                if (move.move_type == MoveType::Move) {
-                    cout << "\t(from " << curr_valve << " to " << move.target_valve << ")" << endl;
-                    auto path = compute_path(curr_valve, move.target_valve);
-                    print_path(path);
+            if (trace) {
+                cout << "moves:" << endl;
+                string curr_valve = start_valve;
+                for (auto move: opt_result.moves) {
+                    if (move.move_type == MoveType::Move) {
+                        cout << "\t(from " << curr_valve << " to " << move.target_valve << ")" << endl;
+                        auto path = compute_path(curr_valve, move.target_valve);
+                        print_steps(path);
 
-                } else
-                    cout << "open " << move.target_valve << endl;
-                
-                curr_valve = move.target_valve;
+                    } else
+                        cout << "open " << move.target_valve << endl;
+                    
+                    curr_valve = move.target_valve;
+                }
+                cout << endl;
             }
-            cout << endl;
+
+            cout << "n_explored_nodes: " << n_explored_nodes << endl;
+            cout << "n_leaves: " << n_leaves << endl;
+            cout << "n_pressure_bound: " << n_pressure_bound << endl;
         }
 
-        OptimizationState optimize_recurse(OptimizationState start_state) {
-            auto start_system_state = start_state.system_state;
-            int depth = 30 - start_system_state.remaining_steps;
-            if (depth < 10)
-                cout << "depth: " << depth << " optimize_recurse" << endl;
 
-            if (start_system_state.remaining_steps <= 0) {
-                //cout << "optimize_recurse; base case; tot_pressure=" << start_state.system_state.tot_pressure << endl;
+        StateAndMoves optimize_recurse(StateAndMoves start_state, int best_so_far) {
+            auto start_system_state = start_state.state;
+            int depth = n_steps - start_system_state.remaining_steps;
+            
+            n_explored_nodes ++;
+            if (start_system_state.remaining_steps == 0) {
+                //cout << "optimize_recurse; base case; tot_pressure=" << start_state.state.tot_pressure << endl;
+                n_leaves ++;
                 return start_state;
-
             }
+
+            assert(start_system_state.remaining_steps > 0);
+
+
+            if (all_valves_open(start_state.state)) {
+                // cout << "pressure so far: " << start_system_state.tot_pressure << 
+                //     " remaining steps: " << start_system_state.remaining_steps << 
+                //     " max flow: " <<  valve_system->get_max_flow() << endl;
+                //start_state.state.tot_pressure += valve_system->get_max_flow() * start_system_state.remaining_steps;
+                cout << "final pressure: " << start_state.state.tot_pressure << endl;
+                n_leaves ++;
+                return start_state;
+            }
+
+            // if (start_state.moves.size() >= 6) {
+            //     cout << "tot_pressure: " << start_state.state.tot_pressure << " n_moves: " << start_state.moves.size() << " optimize_recurse" << endl;
+            //     for (auto move: start_state.moves) {
+            //         cout << move << endl;
+            //     }
+
+            //     //return start_state;
+            // }
 
             //if (curr_state.remaining_steps >= 23)
             //    cout << curr_state.remaining_steps << endl;
             
-            OptimizationState best_state(start_state);
+            StateAndMoves best_result(start_state);
             //cout << "initial best_state: " << best_state << endl;
 
-            for (auto move: enumerate_moves(start_system_state)) {
-                // if (depth == 0)
-                //     cout << "depth: " << depth << " processing move: " << move << endl;
-
-                OptimizationState next_state(start_state);
+            for (auto move: enumerate_moves(start_state)) {
                 ValveSystemState next_system_state = evolve_state(start_system_state, move);
-                //if (next_system_state.tot_pressure > 0)
-                    //cout << "after evolve_state, tot_pressure=" << next_system_state.tot_pressure << endl;
+                if (next_system_state.remaining_steps < 0) {
+                    //cout << "negative remaining steps" << endl;
+                    continue;
+                }
 
-                next_state.system_state = next_system_state;
-                next_state.move_list.push_back(move);
-                // if (depth == 0) {
-                //     cout << "depth: " << depth << " move list before recursion: " << endl;
-                //     for (auto p_move: next_state.move_list)
-                //         cout << p_move << endl;
-                // }
+                StateAndMoves state_and_moves(start_state);
+                state_and_moves.state = next_system_state;
+                state_and_moves.moves.push_back(move);
 
-                if (next_state.system_state.pressure_upper_bound(valve_system) < best_state.system_state.tot_pressure) {
+                //if (pressure_upper_bound_1(next_system_state) <= best_state.state.tot_pressure) {
+                if (pressure_upper_bound_2(next_system_state) <= best_so_far) {
                      n_pressure_bound ++;
                      continue;
                 }
 
-                auto final_state = optimize_recurse(next_state);
-                // if (depth == 0) {
-                //     cout << "depth: " << depth << " final_state.move_list after recursion: " << endl;
-                //     for (auto p_move: final_state.move_list)
-                //         cout << p_move << endl;
-                // }
+                auto opt_result = optimize_recurse(state_and_moves, best_so_far);
 
-                if (final_state.system_state.tot_pressure > best_state.system_state.tot_pressure) {
-                    // if (final_state.system_state.tot_pressure > 1400) {
-                    //     cout << "depth: " << depth << " move " << move << " improves tot_pressure to: " << final_state.system_state.tot_pressure << endl;
+                if (opt_result.state.tot_pressure > best_so_far && opt_result.state.tot_pressure > best_result.state.tot_pressure) {
+                    // if (opt_result.state.tot_pressure > 1300) {
+                    //     cout << "depth: " << depth << " move " << move << " improves tot_pressure to: " 
+                    //         << opt_result.state.tot_pressure << endl;
                     // }
-                    best_state = final_state;
+                    best_result = opt_result;
+                    best_so_far = opt_result.state.tot_pressure;
                 }
             }
 
-            // if (depth == 0) {
-            //     cout << "depth: " << depth << " best_state.move_list: " << endl;
-            //     for (auto p_move: best_state.move_list)
-            //         cout << p_move << endl;
-            // }
-
-            return best_state;
+            return best_result;
         }
 
 
     private:
+        int pressure_upper_bound_1(ValveSystemState system_state) {
+            int res = system_state.tot_pressure;
+            string curr_pos = system_state.curr_pos;
+
+            if (valve_system->get_valve(curr_pos)->flow_rate == 0) {
+                //upper bound cannot be effectively computed
+                return valve_system->get_max_flow() * system_state.remaining_steps;
+            }
+
+            for (auto v_name: valve_system->get_valves()) {
+                if (!system_state.open_valves.contains(v_name)) {
+                    int max_flowing_rounds = system_state.remaining_steps - 1;
+                    res += max_flowing_rounds * (valve_system->get_valve(v_name)->flow_rate);
+                }
+            }
+
+            return res;
+        }
+
+        int pressure_upper_bound_2(ValveSystemState system_state) {
+            int res = system_state.tot_pressure;
+            string curr_pos = system_state.curr_pos;
+
+            if (valve_system->get_valve(curr_pos)->flow_rate == 0) {
+                //upper bound cannot be effectively computed
+                return valve_system->get_max_flow() * system_state.remaining_steps;
+            }
+
+            for (auto v_name: valve_system->get_valves()) {
+                if (!system_state.open_valves.contains(v_name)) {
+                    int min_distance;
+
+                    if (curr_pos == v_name)
+                        min_distance = 0;
+                    else
+                        min_distance = paths[make_pair(curr_pos, v_name)].size();
+
+                    int max_flowing_rounds = system_state.remaining_steps - min_distance - 1;
+                    if (max_flowing_rounds < 0)
+                        max_flowing_rounds = 0;
+
+                    res += max_flowing_rounds * (valve_system->get_valve(v_name)->flow_rate);
+                }
+            }
+
+            return res;
+        }
+
+
+
         map<pair<string, string>, vector<string>> compute_paths(vector<string> nodes) {
             map<pair<string, string>, vector<string>> res;
 
@@ -375,49 +463,48 @@ class Optimizer {
             }
             return res;
         }
+        
 
         vector<string> compute_path(string from, string to) {
-            //cout << "computing path from " << from << " to " << to << endl;
+            //bool trace = (from == "EZ" && to == "IF");
+            bool trace = false;
+            if (trace) cout << "computing path from " << from << " to " << to << endl;
 
-            set<string> open_set;
-            open_set.insert(from);
+            set<string> queue;
 
             map<string, string> came_from;
         
-            map<string, int> g_score;
-            map<string, int> f_score;
+            map<string, int> dists;
             for (auto curr_node: valve_system->get_valves()) {
-                g_score[curr_node] = INT_MAX;
-                f_score[curr_node] = INT_MAX;
+                dists[curr_node] = INT_MAX;
+                queue.insert(curr_node);
             }
 
-            g_score[from] = 0;
-            f_score[from] = heuristic(from, to);
+            dists[from] = 0;
 
-            while (!open_set.empty()) {
-                string curr_node = find_lowest_f(open_set, f_score);
-                //cout << "-- Processing node " << curr_node << endl;
+            while (!queue.empty()) {
+                string curr_node = find_lowest(queue, dists);
+                if (trace) cout << "-- Processing node " << curr_node << endl;
 
                 if (curr_node == to) {
                     vector<string> full_path = reconstruct_path(came_from, curr_node);
                     return full_path;
                 }
 
-                open_set.erase(curr_node);
+                queue.erase(curr_node);
 
                 auto neighbors = find_neighbors(curr_node);
                 for (auto neighbor: neighbors) {
-                    int tentative_g_score = g_score[curr_node] + 1;
-                    if (tentative_g_score < g_score[neighbor]) {
-                        //cout << "-- Better neighbor " << neighbor << " for node " << curr_pos << 
-                        //        " g_score from " << g_score[neighbor] << " to " << tentative_g_score << endl;
+                    if (!queue.contains(neighbor))
+                        continue;
+
+                    int new_dist = dists[curr_node] + 1;
+                    if (new_dist < dists[neighbor]) {
+                        if (trace) cout << "-- Better neighbor " << neighbor << " from node " << curr_node << 
+                                " distance from " << dists[neighbor] << " to " << new_dist << endl;
 
                         came_from[neighbor] = curr_node;
-                        g_score[neighbor] = tentative_g_score;
-                        f_score[neighbor] = heuristic(neighbor, to);
-                        if (!open_set.contains(neighbor)) {
-                            open_set.insert(neighbor);
-                        }
+                        dists[neighbor] = new_dist;
                     }
                 }
             }
@@ -436,12 +523,12 @@ class Optimizer {
         }
 
 
-        vector<ValveMove> enumerate_moves(ValveSystemState from_state) {
+        vector<ValveMove> enumerate_moves(StateAndMoves from) {
             vector<ValveMove> res;
             
-            string from_valve = from_state.curr_pos;
+            string from_valve = from.state.curr_pos;
             bool is_from_flowing = (valve_system->get_valve(from_valve)->flow_rate > 0);
-            bool is_from_open = from_state.open_valves.contains(from_valve);
+            bool is_from_open = from.state.open_valves.contains(from_valve);
 
             if (is_from_flowing && !is_from_open) {
                 ValveMove valve_move(MoveType::Open, from_valve);
@@ -450,12 +537,15 @@ class Optimizer {
 
             }
             
-            //cout << "enumerate_moves b " << endl;
-            for (auto maybe_to_valve: flowing_valves) {
-                if (maybe_to_valve != from_valve && !from_state.open_valves.contains(maybe_to_valve)) {
-                    ValveMove valve_move(MoveType::Move, maybe_to_valve);
-                    //cout << "enumerate_moves b " << valve_move << endl;
-                    res.push_back(valve_move);
+            //moving twice in a row makes no sense
+            if (from.moves.size() == 0 || from.moves[from.moves.size()-1].move_type != MoveType::Move) {
+                for (auto maybe_to_valve: flowing_valves) {
+                    //cout << "enumerate_moves b maybe_to_valve" << maybe_to_valve << endl;
+                    if (maybe_to_valve != from_valve && !from.state.open_valves.contains(maybe_to_valve)) {
+                        ValveMove valve_move(MoveType::Move, maybe_to_valve);
+                        //cout << "enumerate_moves b ok " << valve_move << endl;
+                        res.push_back(valve_move);
+                    }
                 }
             }
 
@@ -469,11 +559,10 @@ class Optimizer {
             if (valve_move.move_type == MoveType::Open) {
                 //cout << "evolve_state - MoveType::Open - remaining_steps=" << start_state.remaining_steps << endl;
 
-                if (start_state.remaining_steps > 1)
-                    res.tot_pressure += valve_system->get_valve(valve_move.target_valve)->flow_rate * (start_state.remaining_steps - 1);
+                res.remaining_steps --;
+                res.tot_pressure += valve_system->get_valve(valve_move.target_valve)->flow_rate * res.remaining_steps;
                 //cout << "evolve_state - MoveType::Open - res.tot_pressure=" << res.tot_pressure<< endl;
                 res.open_valves.insert(valve_move.target_valve);
-                res.remaining_steps --;
             
             } else {
                 vector<string> path;
@@ -488,6 +577,13 @@ class Optimizer {
                     cout << "!!! path is malformed between " << start_state.curr_pos << " and " << valve_move.target_valve << endl;
                 }
 
+                // cout << "evolve_state for move: " << valve_move << endl;
+
+                // cout << "evolve_state - MoveType::Move - path:" << endl;
+                // for (auto step: path) {
+                //     cout << "\t" << step << endl;
+                // }
+
                 res.curr_pos = valve_move.target_valve;
                 res.remaining_steps -= path.size();
             }
@@ -496,14 +592,25 @@ class Optimizer {
             return res;
         }
 
+
+        bool all_valves_open(ValveSystemState system_state) {
+            for (auto v_name: valve_system->get_flowing_valves()) {
+                if (!system_state.open_valves.contains(v_name))
+                    return false;
+            }
+
+            return true;
+        }
+
         ValveSystem *valve_system;
         vector<ValveMove> opt_path;
         
         vector<string> flowing_valves;
         map<pair<string, string>, vector<string>> paths;
 
-        int n_eval_states = 0;
-        int n_pressure_bound = 0;
+        long n_explored_nodes = 0;
+        long n_leaves = 0;
+        long n_pressure_bound = 0;
 };
 
 
@@ -526,7 +633,7 @@ int main(int argc, char *argv[])
         valve_system->add_valve(valve);
     }
 
-    valve_system->print();
+    //valve_system->print();
 
     //const int n_steps = 16;
     const int n_steps = 30;
@@ -534,7 +641,7 @@ int main(int argc, char *argv[])
     Optimizer* opt = new Optimizer(valve_system);
     
     clock_t t_start = clock();
-    opt->optimize(n_steps, start_valve);
+    opt->optimize(start_valve); //1346 KO
     clock_t t_end = clock();
     cout << "Execution time: " << (double) (t_end - t_start) / CLOCKS_PER_SEC << " seconds" << endl;
 

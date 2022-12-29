@@ -165,7 +165,7 @@ class Optimizer {
             //     cout << "\t" << resource_str(choice) << endl; 
             // }
 
-            cout << "n_nodes: " << n_nodes << endl;
+            cout << "n_nodes: " << n_explored_nodes << endl;
             cout << "n_leaves: " << n_leaves << endl;
             cout << "n_pruned_bounds: " << n_pruned_bounds << endl;
 
@@ -179,7 +179,7 @@ class Optimizer {
             ResourceType best_choices[n_turns];
 
 
-            n_nodes ++;
+            n_explored_nodes ++;
 
             if (remaining_turns == 0) {
                 n_leaves ++;
@@ -420,7 +420,7 @@ class Optimizer {
 
 
     Blueprint blueprint;
-    unsigned long long n_nodes = 0;
+    unsigned long long n_explored_nodes = 0;
     unsigned long long n_leaves = 0;
     unsigned long long n_pruned_bounds = 0;
 };

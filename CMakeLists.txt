@@ -4,6 +4,14 @@ cmake_minimum_required (VERSION 3.8)
 project(AoC_2022 CXX)
 set(CMAKE_CXX_STANDARD 20)
 
+
+# set(BOOST_ROOT "/c/boost_1_68_0")
+# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --sysroot=${SYSROOT}")
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --sysroot=${SYSROOT} -I${SYSROOT}/include/libcxx")
+# set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS}")
+# set(CMAKE_FIND_ROOT_PATH "${SYSROOT}")
+
+
 add_executable(day_01a day_01a.cpp)
 add_executable(day_01b day_01b.cpp)
 
@@ -49,18 +57,18 @@ add_executable(day_14b day_14b.cpp)
 add_executable(day_15a day_15a.cpp)
 add_executable(day_15b day_15b.cpp)
 
-#add_executable(day_16a day_16a.cpp)
-add_executable(day_16a day_16a_02.cpp) #KO
-#add_executable(day_16b day_16b.cpp)
+add_executable(day_16a day_16a.cpp)
+#add_executable(day_16a_aux day_16a_aux.cpp)
+add_executable(day_16b day_16b.cpp)
 
 add_executable(day_17a day_17a.cpp)
-add_executable(day_17b day_17b.cpp) #KO
+add_executable(day_17b day_17b.cpp)
 
 add_executable(day_18a day_18a.cpp)
 add_executable(day_18b day_18b.cpp)
 
 add_executable(day_19a day_19a.cpp)
-add_executable(day_19b day_19b.cpp) #KO
+add_executable(day_19b day_19b.cpp)
 
 add_executable(day_20a day_20a.cpp)
 add_executable(day_20b day_20b.cpp)
